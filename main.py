@@ -1,5 +1,6 @@
 import glfw
 from OpenGL.GL import *
+import OpenGL.GL.shaders as gls
 import numpy as np
 import ctypes
 
@@ -37,10 +38,11 @@ for triangulo in indices:
 
 vertices_array = np.array(vertices_desenho, dtype=np.float32)
 vaoId = 0
+shaderId = 0
 
 # Função para configurações iniciais
 def init():
-    global vaoId
+    global vaoId, shaderId
     glClearColor(1, 1, 1, 1)
 
     vaoId = glGenVertexArrays(1)
@@ -55,14 +57,25 @@ def init():
     glBindBuffer(GL_ARRAY_BUFFER, 0)
     glBindVertexArray(0)
 
+    with open('shaders/cubo_vert.glsl', 'r') as file:
+        vsSource = file.read()
+    with open('shaders/cubo_frag.glsl', 'r') as file:
+        fsSource = file.read()
+
+    vsId = gls.compileShader(vsSource, GL_VERTEX_SHADER)
+    fsId = gls.compileShader(fsSource, GL_FRAGMENT_SHADER)
+    shaderId = gls.compileProgram(vsId, fsId)
+
 # Função para atualizar a renderização
 def render():
     glClear(GL_COLOR_BUFFER_BIT)
+    glUseProgram(shaderId)
 
     glBindVertexArray(vaoId)
     glDrawArrays(GL_TRIANGLES, 0, len(vertices_desenho))
 
     glBindVertexArray(0)
+    glUseProgram(0)
 
 # Função Principal
 def main():
