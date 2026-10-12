@@ -58,6 +58,76 @@ cor_loc = -1
 visualizacao = glm.mat4(1.0)
 projecao = glm.mat4(1.0)
 
+camera_alvo = glm.vec3(0.0, -0.5, 0.0)
+
+# Mantém a distância e o enquadramento inicial da câmera atual
+camera_distancia = glm.length(glm.vec3(0.0, 5.5, 11.0))
+camera_yaw = 0.0
+camera_pitch = 26.565
+
+arrastando_mouse = False
+mouse_x_anterior = 0.0
+mouse_y_anterior = 0.0
+
+camera_pos = glm.vec3(0.0, 5.0, 11.0)
+
+def atualizar_visualizacao():
+    global visualizacao
+    visualizacao = glm.lookAt(
+        camera_pos,
+        camera_alvo,
+        glm.vec3(0.0, 1.0, 0.0)
+    )
+
+def atualizar_camera_orbita():
+    global camera_pos, camera_pitch
+
+    camera_pitch = max(-85.0, min(85.0, camera_pitch))
+
+    yaw_rad = glm.radians(camera_yaw)
+    pitch_rad = glm.radians(camera_pitch)
+    distancia_horizontal = camera_distancia * glm.cos(pitch_rad)
+
+    camera_pos = camera_alvo + glm.vec3(
+        distancia_horizontal * glm.sin(yaw_rad),
+        camera_distancia * glm.sin(pitch_rad),
+        distancia_horizontal * glm.cos(yaw_rad)
+    )
+
+    atualizar_visualizacao()
+
+
+def botao_mouse(window, button, action, mods):
+    global arrastando_mouse, mouse_x_anterior, mouse_y_anterior
+
+    if button != glfw.MOUSE_BUTTON_LEFT:
+        return
+
+    if action == glfw.PRESS:
+        arrastando_mouse = True
+        mouse_x_anterior, mouse_y_anterior = glfw.get_cursor_pos(window)
+    elif action == glfw.RELEASE:
+        arrastando_mouse = False
+
+
+def mover_mouse(window, xpos, ypos):
+    global mouse_x_anterior, mouse_y_anterior
+    global camera_yaw, camera_pitch
+
+    if not arrastando_mouse:
+        return
+
+    diferenca_x = xpos - mouse_x_anterior
+    diferenca_y = ypos - mouse_y_anterior
+
+    mouse_x_anterior = xpos
+    mouse_y_anterior = ypos
+
+    sensibilidade = 0.25
+    camera_yaw -= diferenca_x * sensibilidade
+    camera_pitch -= diferenca_y * sensibilidade
+
+    atualizar_camera_orbita()
 
 # ============================================================
 # INICIALIZACAO
@@ -110,11 +180,7 @@ def init():
     shaderId = gls.compileProgram(vsId, fsId)
 
     # Camera em perspectiva
-    visualizacao = glm.lookAt(
-    glm.vec3(0.0, 5.0, 11.0),
-    glm.vec3(0.0, -0.5, 0.0),
-    glm.vec3(0.0, 1.0, 0.0)
-)
+    atualizar_visualizacao()
 
     atualizar_projecao(800, 600)
 
@@ -321,6 +387,37 @@ def render():
 # PROGRAMA PRINCIPAL
 # ============================================================
 
+def mover_camera(window, key, scancode, action, mods):
+    global camera_pos, camera_alvo
+
+    if action not in (glfw.PRESS, glfw.REPEAT):
+        return
+
+    passo = 0.25
+    movimentos = {
+        glfw.KEY_LEFT:  glm.vec3(-passo, 0.0, 0.0),
+        glfw.KEY_RIGHT: glm.vec3(passo, 0.0, 0.0),
+        glfw.KEY_UP:    glm.vec3(0.0, passo, 0.0),
+        glfw.KEY_DOWN:  glm.vec3(0.0, -passo, 0.0),
+    }
+
+    deslocamento = movimentos.get(key)
+    if deslocamento is not None:
+        camera_pos += deslocamento
+        camera_alvo += deslocamento
+        atualizar_visualizacao()
+
+def zoom_camera(window, xoffset, yoffset):
+    global camera_distancia
+
+    if yoffset == 0:
+        return
+
+    fator = 0.9 if yoffset > 0 else 1.1
+    camera_distancia = max(3.0, min(30.0, camera_distancia * fator))
+
+    atualizar_camera_orbita()
+
 def main():
     if not glfw.init():
         raise RuntimeError("Nao foi possivel inicializar o GLFW.")
@@ -340,6 +437,10 @@ def main():
     )
 
     init()
+
+    glfw.set_mouse_button_callback(window, botao_mouse)
+    glfw.set_cursor_pos_callback(window, mover_mouse)
+    glfw.set_scroll_callback(window, zoom_camera)
 
     while not glfw.window_should_close(window):
         glfw.poll_events()
