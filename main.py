@@ -1,4 +1,3 @@
-
 import glfw
 from OpenGL.GL import *
 import OpenGL.GL.shaders as gls
@@ -9,7 +8,7 @@ from pathlib import Path
 
 
 # ============================================================
-# GEOMETRIA: CUBO COM 12 TRIANGULOS
+# GEOMETRIA: CUBO COM 12 TRIANGULOS (8 VERTICES + EBO)
 # ============================================================
 
 vertices = [
@@ -32,15 +31,10 @@ indices = [
     (0, 3, 7), (0, 7, 4)
 ]
 
-vertices_desenho = []
-
-for triangulo in indices:
-    for indice in triangulo:
-        vertices_desenho.append(vertices[indice])
-
-vertices_array = np.array(
-    vertices_desenho, dtype=np.float32
-)
+# Apenas 8 vertices na GPU; os indices dizem como formar os triangulos
+vertices_array = np.array(vertices, dtype=np.float32)
+indices_array = np.array(indices, dtype=np.uint8).flatten()
+total_indices = indices_array.size
 
 
 # ============================================================
@@ -57,6 +51,9 @@ cor_loc = -1
 
 visualizacao = glm.mat4(1.0)
 projecao = glm.mat4(1.0)
+
+# Lista de (matriz_modelo, cor) calculada uma unica vez
+cubos = []
 
 camera_alvo = glm.vec3(0.0, -0.5, 0.0)
 
@@ -137,7 +134,6 @@ def init():
     global vaoId, shaderId
     global modelo_loc, visualizacao_loc
     global projecao_loc, cor_loc
-    global visualizacao, projecao
 
     glClearColor(0.12, 0.16, 0.20, 1.0)
     glEnable(GL_DEPTH_TEST)
@@ -163,8 +159,20 @@ def init():
     )
     glEnableVertexAttribArray(0)
 
-    glBindBuffer(GL_ARRAY_BUFFER, 0)
+    # Criacao do EBO (fica guardado dentro do VAO,
+    # por isso NAO desvincular antes do VAO)
+    eboId = glGenBuffers(1)
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, eboId)
+
+    glBufferData(
+        GL_ELEMENT_ARRAY_BUFFER,
+        indices_array.nbytes,
+        indices_array,
+        GL_STATIC_DRAW
+    )
+
     glBindVertexArray(0)
+    glBindBuffer(GL_ARRAY_BUFFER, 0)
 
     # Carregar shaders da pasta do projeto
     pasta = Path(__file__).resolve().parent
@@ -179,10 +187,8 @@ def init():
     fsId = gls.compileShader(fsSource, GL_FRAGMENT_SHADER)
     shaderId = gls.compileProgram(vsId, fsId)
 
-    # Camera em perspectiva
-    atualizar_visualizacao()
-
-    atualizar_projecao(800, 600)
+    # Camera em perspectiva (posicao calculada pela orbita)
+    atualizar_camera_orbita()
 
     # Localizacao das variaveis uniformes
     modelo_loc = glGetUniformLocation(shaderId, "modelo")
@@ -191,6 +197,9 @@ def init():
     )
     projecao_loc = glGetUniformLocation(shaderId, "projecao")
     cor_loc = glGetUniformLocation(shaderId, "corObjeto")
+
+    # A cena e estatica: monta as matrizes uma unica vez
+    construir_laboratorio()
 
 
 def atualizar_projecao(largura, altura):
@@ -214,10 +223,11 @@ def redimensionar_janela(window, largura, altura):
 
 
 # ============================================================
-# DESENHAR UM CUBO COM POSICAO, ESCALA E COR
+# REGISTRAR UM CUBO COM POSICAO, ESCALA E COR
+# (a matriz modelo e calculada uma vez, nao a cada frame)
 # ============================================================
 
-def desenhar_cubo(posicao, escala, cor):
+def adicionar_cubo(posicao, escala, cor):
     modelo = glm.mat4(1.0)
 
     modelo = glm.translate(
@@ -230,59 +240,61 @@ def desenhar_cubo(posicao, escala, cor):
         glm.vec3(*escala)
     )
 
-    glUniformMatrix4fv(
-        modelo_loc, 1, GL_FALSE, glm.value_ptr(modelo)
-    )
+    cubos.append((modelo, cor))
 
-    glUniform3f(
-        cor_loc, cor[0], cor[1], cor[2]
-    )
 
-    glBindVertexArray(vaoId)
+def desenhar_cubos():
+    for modelo, cor in cubos:
+        glUniformMatrix4fv(
+            modelo_loc, 1, GL_FALSE, glm.value_ptr(modelo)
+        )
 
-    glDrawArrays(
-        GL_TRIANGLES, 0, len(vertices_desenho)
-    )
+        glUniform3f(
+            cor_loc, cor[0], cor[1], cor[2]
+        )
 
-    glBindVertexArray(0)
+        glDrawElements(
+            GL_TRIANGLES, total_indices,
+            GL_UNSIGNED_BYTE, ctypes.c_void_p(0)
+        )
 
 
 # ============================================================
 # CONSTRUCAO DO LABORATORIO
 # ============================================================
 
-def desenhar_laboratorio():
+def construir_laboratorio():
 
     # Chao
-    desenhar_cubo(
+    adicionar_cubo(
         (0, -2.5, 0),
         (5, 0.1, 5),
         (0.35, 0.38, 0.40)
     )
 
     # Parede do fundo
-    desenhar_cubo(
+    adicionar_cubo(
         (0, 0, -4.9),
         (5, 2.5, 0.1),
         (0.72, 0.76, 0.80)
     )
 
     # Parede esquerda
-    desenhar_cubo(
+    adicionar_cubo(
         (-4.9, 0, 0),
         (0.1, 2.5, 5),
         (0.55, 0.62, 0.68)
     )
 
     # Parede direita
-    desenhar_cubo(
+    adicionar_cubo(
         (4.9, 0, 0),
         (0.1, 2.5, 5),
         (0.55, 0.62, 0.68)
     )
 
     # Tampo da bancada
-    desenhar_cubo(
+    adicionar_cubo(
         (0, -0.65, -1.0),
         (2.0, 0.15, 1.0),
         (0.45, 0.27, 0.15)
@@ -291,35 +303,35 @@ def desenhar_laboratorio():
     # Pernas da bancada
     for x in (-1.75, 1.75):
         for z in (-1.8, -0.2):
-            desenhar_cubo(
+            adicionar_cubo(
                 (x, -1.55, z),
                 (0.12, 0.8, 0.12),
                 (0.25, 0.27, 0.29)
             )
 
     # Base do microscopio
-    desenhar_cubo(
+    adicionar_cubo(
         (-0.7, -0.42, -1.0),
         (0.4, 0.08, 0.3),
         (0.12, 0.18, 0.22)
     )
 
     # Coluna do microscopio
-    desenhar_cubo(
+    adicionar_cubo(
         (-0.7, -0.05, -1.0),
         (0.08, 0.32, 0.08),
         (0.15, 0.20, 0.24)
     )
 
     # Parte superior do microscopio
-    desenhar_cubo(
+    adicionar_cubo(
         (-0.7, 0.22, -1.0),
         (0.25, 0.08, 0.12),
         (0.18, 0.25, 0.30)
     )
 
     # Ocular
-    desenhar_cubo(
+    adicionar_cubo(
         (-0.88, 0.35, -1.0),
         (0.08, 0.12, 0.08),
         (0.08, 0.09, 0.10)
@@ -331,20 +343,20 @@ def desenhar_laboratorio():
         (0.9, (0.25, 0.75, 0.45)),
         (1.5, (0.85, 0.55, 0.20))
     ]:
-        desenhar_cubo(
+        adicionar_cubo(
             (x, -0.35, -1.2),
             (0.18, 0.25, 0.18),
             cor
         )
 
-        desenhar_cubo(
+        adicionar_cubo(
             (x, -0.05, -1.2),
             (0.08, 0.06, 0.08),
             (0.20, 0.22, 0.24)
         )
 
     # Suporte de tubos de ensaio
-    desenhar_cubo(
+    adicionar_cubo(
         (0.5, -0.40, -0.2),
         (0.55, 0.08, 0.25),
         (0.25, 0.18, 0.12)
@@ -352,7 +364,7 @@ def desenhar_laboratorio():
 
     # Tubos simplificados
     for x in (0.15, 0.5, 0.85):
-        desenhar_cubo(
+        adicionar_cubo(
             (x, -0.20, -0.2),
             (0.09, 0.15, 0.09),
             (0.35, 0.75, 0.85)
@@ -378,7 +390,10 @@ def render():
         glm.value_ptr(projecao)
     )
 
-    desenhar_laboratorio()
+    # VAO vinculado uma vez por frame (e nao a cada cubo)
+    glBindVertexArray(vaoId)
+    desenhar_cubos()
+    glBindVertexArray(0)
 
     glUseProgram(0)
 
@@ -432,15 +447,22 @@ def main():
 
     glfw.make_context_current(window)
 
+    # VSync: limita ao refresh do monitor (evita usar 100% da GPU/CPU)
+    glfw.swap_interval(1)
+
     glfw.set_framebuffer_size_callback(
         window, redimensionar_janela
     )
 
     init()
 
+    # Usa o tamanho real do framebuffer (correto em telas com escala/HiDPI)
+    atualizar_projecao(*glfw.get_framebuffer_size(window))
+
     glfw.set_mouse_button_callback(window, botao_mouse)
     glfw.set_cursor_pos_callback(window, mover_mouse)
     glfw.set_scroll_callback(window, zoom_camera)
+    glfw.set_key_callback(window, mover_camera)
 
     while not glfw.window_should_close(window):
         glfw.poll_events()
