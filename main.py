@@ -68,6 +68,12 @@ mouse_y_anterior = 0.0
 
 camera_pos = glm.vec3(0.0, 5.0, 11.0)
 
+modo_primeira_pessoa = False
+
+primeira_pessoa_pos = glm.vec3(0.0, 0.8, 3.5)
+primeira_pessoa_yaw = 0.0
+primeira_pessoa_pitch = 0.0
+
 def atualizar_visualizacao():
     global visualizacao
     visualizacao = glm.lookAt(
@@ -93,6 +99,67 @@ def atualizar_camera_orbita():
 
     atualizar_visualizacao()
 
+def direcao_primeira_pessoa():
+    yaw_rad = glm.radians(primeira_pessoa_yaw)
+    pitch_rad = glm.radians(primeira_pessoa_pitch)
+
+    return glm.normalize(glm.vec3(
+        glm.sin(yaw_rad) * glm.cos(pitch_rad),
+        glm.sin(pitch_rad),
+        -glm.cos(yaw_rad) * glm.cos(pitch_rad)
+    ))
+
+
+def atualizar_camera_primeira_pessoa():
+    global visualizacao
+
+    direcao = direcao_primeira_pessoa()
+    visualizacao = glm.lookAt(
+        primeira_pessoa_pos,
+        primeira_pessoa_pos + direcao,
+        glm.vec3(0.0, 1.0, 0.0)
+    )
+
+def mover_primeira_pessoa(window, delta_tempo):
+    global primeira_pessoa_pos
+
+    if not modo_primeira_pessoa:
+        return
+
+    yaw_rad = glm.radians(primeira_pessoa_yaw)
+
+    frente = glm.vec3(
+        glm.sin(yaw_rad),
+        0.0,
+        -glm.cos(yaw_rad)
+    )
+    direita = glm.vec3(
+        glm.cos(yaw_rad),
+        0.0,
+        glm.sin(yaw_rad)
+    )
+
+    deslocamento = glm.vec3(0.0)
+
+    if glfw.get_key(window, glfw.KEY_W) == glfw.PRESS:
+        deslocamento += frente
+    if glfw.get_key(window, glfw.KEY_S) == glfw.PRESS:
+        deslocamento -= frente
+    if glfw.get_key(window, glfw.KEY_D) == glfw.PRESS:
+        deslocamento += direita
+    if glfw.get_key(window, glfw.KEY_A) == glfw.PRESS:
+        deslocamento -= direita
+
+    if glm.length(deslocamento) > 0.0:
+        velocidade = 3.0
+        deslocamento = glm.normalize(deslocamento) * velocidade * delta_tempo
+        nova_posicao = primeira_pessoa_pos + deslocamento
+
+        nova_posicao.x = max(-4.5, min(4.5, nova_posicao.x))
+        nova_posicao.z = max(-4.5, min(4.5, nova_posicao.z))
+
+        primeira_pessoa_pos = nova_posicao
+        atualizar_camera_primeira_pessoa()
 
 def botao_mouse(window, button, action, mods):
     global arrastando_mouse, mouse_x_anterior, mouse_y_anterior
@@ -110,9 +177,7 @@ def botao_mouse(window, button, action, mods):
 def mover_mouse(window, xpos, ypos):
     global mouse_x_anterior, mouse_y_anterior
     global camera_yaw, camera_pitch
-
-    if not arrastando_mouse:
-        return
+    global primeira_pessoa_yaw, primeira_pessoa_pitch
 
     diferenca_x = xpos - mouse_x_anterior
     diferenca_y = ypos - mouse_y_anterior
@@ -121,6 +186,19 @@ def mover_mouse(window, xpos, ypos):
     mouse_y_anterior = ypos
 
     sensibilidade = 0.25
+
+    if modo_primeira_pessoa:
+        primeira_pessoa_yaw += diferenca_x * sensibilidade
+        primeira_pessoa_pitch -= diferenca_y * sensibilidade
+        primeira_pessoa_pitch = max(
+            -89.0, min(89.0, primeira_pessoa_pitch)
+        )
+        atualizar_camera_primeira_pessoa()
+        return
+
+    if not arrastando_mouse:
+        return
+
     camera_yaw -= diferenca_x * sensibilidade
     camera_pitch -= diferenca_y * sensibilidade
 
@@ -208,8 +286,10 @@ def atualizar_projecao(largura, altura):
     if altura == 0:
         return
 
+    campo_visao = 55.0 if modo_primeira_pessoa else 45.0
+
     projecao = glm.perspective(
-        glm.radians(45.0),
+        glm.radians(campo_visao),
         largura / altura,
         0.1,
         100.0
@@ -408,7 +488,22 @@ def mover_camera(window, key, scancode, action, mods):
     if action not in (glfw.PRESS, glfw.REPEAT):
         return
 
+    global modo_primeira_pessoa
+
+    if key == glfw.KEY_1:
+        modo_primeira_pessoa = True
+        atualizar_camera_primeira_pessoa()
+        atualizar_projecao(*glfw.get_framebuffer_size(window))
+        return
+
+    if key == glfw.KEY_3:
+        modo_primeira_pessoa = False
+        atualizar_visualizacao()
+        atualizar_projecao(*glfw.get_framebuffer_size(window))
+        return
+
     passo = 0.25
+    
     movimentos = {
         glfw.KEY_LEFT:  glm.vec3(-passo, 0.0, 0.0),
         glfw.KEY_RIGHT: glm.vec3(passo, 0.0, 0.0),
@@ -424,6 +519,9 @@ def mover_camera(window, key, scancode, action, mods):
 
 def zoom_camera(window, xoffset, yoffset):
     global camera_distancia
+
+    if modo_primeira_pessoa:
+        return
 
     if yoffset == 0:
         return
@@ -464,8 +562,15 @@ def main():
     glfw.set_scroll_callback(window, zoom_camera)
     glfw.set_key_callback(window, mover_camera)
 
+    ultimo_tempo = glfw.get_time()
+
     while not glfw.window_should_close(window):
         glfw.poll_events()
+        agora = glfw.get_time()
+        delta_tempo = agora - ultimo_tempo
+        ultimo_tempo = agora
+
+        mover_primeira_pessoa(window, delta_tempo)
         render()
         glfw.swap_buffers(window)
 
