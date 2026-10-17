@@ -1,4 +1,5 @@
 import glm
+from src.game.colisao import resolver_movimento
 
 class Camera:
     def __init__(self):
@@ -48,7 +49,7 @@ class Camera:
             -glm.cos(yaw_rad) * glm.cos(pitch_rad)
         ))
 
-    def mover_fp(self, window, delta_tempo, glfw):
+    def mover_fp(self, window, delta_tempo, glfw, objetos_colisao):
         if not self.modo_primeira_pessoa:
             return
 
@@ -65,7 +66,7 @@ class Camera:
         if glm.length(deslocamento) > 0.0:
             velocidade = 3.0
             deslocamento = glm.normalize(deslocamento) * velocidade * delta_tempo
-            nova_pos = self.fp_pos + deslocamento
+            nova_pos = resolver_movimento(self.fp_pos, deslocamento, objetos_colisao)
             nova_pos.x = max(-4.5, min(4.5, nova_pos.x))
             nova_pos.z = max(-4.5, min(4.5, nova_pos.z))
             self.fp_pos = nova_pos

@@ -5,10 +5,11 @@ from OpenGL.GL import *
 
 class Cubo:
 
-    def __init__(self, posicao, escala, cor):
+    def __init__(self, posicao, escala, cor, colisivel=False):
         self.posicao = glm.vec3(*posicao)
         self.escala = glm.vec3(*escala)
         self.cor = tuple(cor)
+        self.colisivel = colisivel
 
         modelo = glm.mat4(1.0)
         modelo = glm.translate(modelo, self.posicao)

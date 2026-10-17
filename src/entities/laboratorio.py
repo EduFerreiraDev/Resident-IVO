@@ -10,7 +10,7 @@ def construir_laboratorio():
     cubos.append(Cubo((4.9, 0, 0), (0.1, 2.5, 5), (0.55, 0.62, 0.68)))
 
     # Bancada
-    cubos.append(Cubo((0, -0.65, -1.0), (2.0, 0.15, 1.0), (0.45, 0.27, 0.15)))
+    cubos.append(Cubo((0, -0.65, -1.0), (2.0, 0.15, 1.0), (0.45, 0.27, 0.15), colisivel=True))
     for x in (-1.75, 1.75):
         for z in (-1.8, -0.2):
             cubos.append(Cubo((x, -1.55, z), (0.12, 0.8, 0.12), (0.25, 0.27, 0.29)))

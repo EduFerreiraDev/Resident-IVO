@@ -33,6 +33,17 @@ camera = Camera()
 arrastando_mouse = False
 mouse_x_anterior, mouse_y_anterior = 0.0, 0.0
 
+def configurar_cursor(window, modo_primeira_pessoa):
+    global mouse_x_anterior, mouse_y_anterior
+
+    modo_cursor = (
+        glfw.CURSOR_DISABLED
+        if modo_primeira_pessoa
+        else glfw.CURSOR_NORMAL
+    )
+    glfw.set_input_mode(window, glfw.CURSOR, modo_cursor)
+    mouse_x_anterior, mouse_y_anterior = glfw.get_cursor_pos(window)
+
 def mouse_button_callback(window, button, action, mods):
     global arrastando_mouse, mouse_x_anterior, mouse_y_anterior
     if button != glfw.MOUSE_BUTTON_LEFT: return
@@ -64,12 +75,16 @@ def key_callback(window, key, scancode, action, mods):
     if action not in (glfw.PRESS, glfw.REPEAT): return
 
     if key == glfw.KEY_1:
-        camera.modo_primeira_pessoa = True
+        if not camera.modo_primeira_pessoa:
+            camera.modo_primeira_pessoa = True
+        configurar_cursor(window, True)
         camera.atualizar_view()
         atualizar_projecao(*glfw.get_framebuffer_size(window))
         return
     if key == glfw.KEY_3:
-        camera.modo_primeira_pessoa = False
+        if camera.modo_primeira_pessoa:
+            camera.modo_primeira_pessoa = False
+            configurar_cursor(window, False)
         camera.atualizar_view()
         atualizar_projecao(*glfw.get_framebuffer_size(window))
         return
@@ -157,6 +172,7 @@ def main():
         raise RuntimeError("Erro ao criar janela")
 
     glfw.make_context_current(window)
+    configurar_cursor(window, camera.modo_primeira_pessoa)
     glfw.swap_interval(1)
 
     glfw.set_framebuffer_size_callback(window, lambda w, sw, sh: atualizar_projecao(sw, sh))
@@ -175,7 +191,7 @@ def main():
         delta_tempo = agora - ultimo_tempo
         ultimo_tempo = agora
 
-        camera.mover_fp(window, delta_tempo, glfw)
+        camera.mover_fp(window, delta_tempo, glfw, cubos)
         render()
         glfw.swap_buffers(window)
 
