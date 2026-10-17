@@ -5,6 +5,7 @@ import numpy as np
 import ctypes
 import glm
 from pathlib import Path
+from  cubo import Cubo
 
 
 # ============================================================
@@ -255,10 +256,10 @@ def init():
     # Carregar shaders da pasta do projeto
     pasta = Path(__file__).resolve().parent
 
-    with open(pasta / "shaders/cubo_vert.glsl", "r", encoding="utf-8") as f:
+    with open(pasta / "C:/PROGRAMAÇÃO/vscode/Python/CG/trab_CG/cubo_vert.glsl", "r", encoding="utf-8") as f:
         vsSource = f.read()
 
-    with open(pasta / "shaders/cubo_frag.glsl", "r", encoding="utf-8") as f:
+    with open(pasta / "C:/PROGRAMAÇÃO/vscode/Python/CG/trab_CG/cubo_frag.glsl", "r", encoding="utf-8") as f:
         fsSource = f.read()
 
     vsId = gls.compileShader(vsSource, GL_VERTEX_SHADER)
@@ -307,36 +308,10 @@ def redimensionar_janela(window, largura, altura):
 # (a matriz modelo e calculada uma vez, nao a cada frame)
 # ============================================================
 
-def adicionar_cubo(posicao, escala, cor):
-    modelo = glm.mat4(1.0)
-
-    modelo = glm.translate(
-        modelo,
-        glm.vec3(*posicao)
-    )
-
-    modelo = glm.scale(
-        modelo,
-        glm.vec3(*escala)
-    )
-
-    cubos.append((modelo, cor))
-
 
 def desenhar_cubos():
-    for modelo, cor in cubos:
-        glUniformMatrix4fv(
-            modelo_loc, 1, GL_FALSE, glm.value_ptr(modelo)
-        )
-
-        glUniform3f(
-            cor_loc, cor[0], cor[1], cor[2]
-        )
-
-        glDrawElements(
-            GL_TRIANGLES, total_indices,
-            GL_UNSIGNED_BYTE, ctypes.c_void_p(0)
-        )
+    for cubo in cubos:
+        cubo.desenhar(modelo_loc, cor_loc, total_indices)
 
 
 # ============================================================
@@ -346,76 +321,36 @@ def desenhar_cubos():
 def construir_laboratorio():
 
     # Chao
-    adicionar_cubo(
-        (0, -2.5, 0),
-        (5, 0.1, 5),
-        (0.35, 0.38, 0.40)
-    )
+    cubos.append(Cubo((0, -2.5, 0),(5, 0.1, 5),(0.35, 0.38, 0.40)))
 
     # Parede do fundo
-    adicionar_cubo(
-        (0, 0, -4.9),
-        (5, 2.5, 0.1),
-        (0.72, 0.76, 0.80)
-    )
+    cubos.append(Cubo((0, 0, -4.9),(5, 2.5, 0.1),(0.72, 0.76, 0.80)))
 
     # Parede esquerda
-    adicionar_cubo(
-        (-4.9, 0, 0),
-        (0.1, 2.5, 5),
-        (0.55, 0.62, 0.68)
-    )
+    cubos.append(Cubo((-4.9, 0, 0),(0.1, 2.5, 5),(0.55, 0.62, 0.68)))
 
     # Parede direita
-    adicionar_cubo(
-        (4.9, 0, 0),
-        (0.1, 2.5, 5),
-        (0.55, 0.62, 0.68)
-    )
+    cubos.append(Cubo((4.9, 0, 0),(0.1, 2.5, 5),(0.55, 0.62, 0.68)))
 
     # Tampo da bancada
-    adicionar_cubo(
-        (0, -0.65, -1.0),
-        (2.0, 0.15, 1.0),
-        (0.45, 0.27, 0.15)
-    )
+    cubos.append(Cubo((0, -0.65, -1.0),(2.0, 0.15, 1.0),(0.45, 0.27, 0.15)))
 
     # Pernas da bancada
     for x in (-1.75, 1.75):
         for z in (-1.8, -0.2):
-            adicionar_cubo(
-                (x, -1.55, z),
-                (0.12, 0.8, 0.12),
-                (0.25, 0.27, 0.29)
-            )
+            cubos.append(Cubo((x, -1.55, z),(0.12, 0.8, 0.12),(0.25, 0.27, 0.29)))
 
     # Base do microscopio
-    adicionar_cubo(
-        (-0.7, -0.42, -1.0),
-        (0.4, 0.08, 0.3),
-        (0.12, 0.18, 0.22)
-    )
+    cubos.append(Cubo((-0.7, -0.42, -1.0),(0.4, 0.08, 0.3),(0.12, 0.18, 0.22)))
 
     # Coluna do microscopio
-    adicionar_cubo(
-        (-0.7, -0.05, -1.0),
-        (0.08, 0.32, 0.08),
-        (0.15, 0.20, 0.24)
-    )
+    cubos.append(Cubo((-0.7, -0.05, -1.0),(0.08, 0.32, 0.08),(0.15, 0.20, 0.24)))
 
     # Parte superior do microscopio
-    adicionar_cubo(
-        (-0.7, 0.22, -1.0),
-        (0.25, 0.08, 0.12),
-        (0.18, 0.25, 0.30)
-    )
+    cubos.append(Cubo((-0.7, 0.22, -1.0),(0.25, 0.08, 0.12),(0.18, 0.25, 0.30)))
 
     # Ocular
-    adicionar_cubo(
-        (-0.88, 0.35, -1.0),
-        (0.08, 0.12, 0.08),
-        (0.08, 0.09, 0.10)
-    )
+    cubos.append(Cubo((-0.88, 0.35, -1.0),(0.08, 0.12, 0.08),(0.08, 0.09, 0.10)))
 
     # Frascos: base e tampa
     for x, cor in [
@@ -423,32 +358,16 @@ def construir_laboratorio():
         (0.9, (0.25, 0.75, 0.45)),
         (1.5, (0.85, 0.55, 0.20))
     ]:
-        adicionar_cubo(
-            (x, -0.35, -1.2),
-            (0.18, 0.25, 0.18),
-            cor
-        )
+        cubos.append(Cubo((x, -0.35, -1.2),(0.18, 0.25, 0.18),cor))
 
-        adicionar_cubo(
-            (x, -0.05, -1.2),
-            (0.08, 0.06, 0.08),
-            (0.20, 0.22, 0.24)
-        )
+        cubos.append(Cubo((x, -0.05, -1.2),(0.08, 0.06, 0.08),(0.20, 0.22, 0.24)))
 
     # Suporte de tubos de ensaio
-    adicionar_cubo(
-        (0.5, -0.40, -0.2),
-        (0.55, 0.08, 0.25),
-        (0.25, 0.18, 0.12)
-    )
+    cubos.append(Cubo((0.5, -0.40, -0.2),(0.55, 0.08, 0.25),(0.25, 0.18, 0.12)))
 
     # Tubos simplificados
     for x in (0.15, 0.5, 0.85):
-        adicionar_cubo(
-            (x, -0.20, -0.2),
-            (0.09, 0.15, 0.09),
-            (0.35, 0.75, 0.85)
-        )
+        cubos.append(Cubo((x, -0.20, -0.2),(0.09, 0.15, 0.09),(0.35, 0.75, 0.85)))
 
 
 # ============================================================
