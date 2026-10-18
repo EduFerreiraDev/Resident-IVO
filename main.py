@@ -8,6 +8,8 @@ from pathlib import Path
 
 from src.core.camera import Camera
 from src.entities.laboratorio import construir_laboratorio
+from src.game.organizador import Organizador
+from src.entities.cubo import INDICES_ARESTAS
 
 vertices = [
     (1, 1, 1), (-1, 1, 1), (-1, -1, 1), (1, -1, 1),
@@ -25,13 +27,18 @@ total_indices = indices_array.size
 
 # Variáveis globais de controle
 vaoId, shaderId = 0, 0
+ebo_triangulos_id, ebo_arestas_id = 0, 0
 modelo_loc, visualizacao_loc, projecao_loc, cor_loc = -1, -1, -1, -1
 projecao = glm.mat4(1.0)
 cubos = []
+objetos_moveis = []
 camera = Camera()
 
 arrastando_mouse = False
 mouse_x_anterior, mouse_y_anterior = 0.0, 0.0
+organizador = None
+objeto_selecionado = None
+objeto_hover = None
 
 def configurar_cursor(window, modo_primeira_pessoa):
     global mouse_x_anterior, mouse_y_anterior
@@ -46,15 +53,63 @@ def configurar_cursor(window, modo_primeira_pessoa):
 
 def mouse_button_callback(window, button, action, mods):
     global arrastando_mouse, mouse_x_anterior, mouse_y_anterior
-    if button != glfw.MOUSE_BUTTON_LEFT: return
+    global objeto_selecionado, objeto_hover
+
+    if button != glfw.MOUSE_BUTTON_LEFT:
+        return
+
     if action == glfw.PRESS:
         arrastando_mouse = True
         mouse_x_anterior, mouse_y_anterior = glfw.get_cursor_pos(window)
+        objeto_selecionado = None
+        objeto_hover = None
+
+        if not camera.modo_primeira_pessoa:
+            largura, altura = glfw.get_window_size(window)
+            objeto_selecionado = organizador.selecionar(
+                mouse_x_anterior,
+                mouse_y_anterior,
+                largura,
+                altura,
+                camera,
+                projecao,
+            )
+
+            if objeto_selecionado is not None:
+                iniciou_arraste = organizador.iniciar_arraste(
+                    objeto_selecionado,
+                    mouse_x_anterior,
+                    mouse_y_anterior,
+                    largura,
+                    altura,
+                    camera,
+                    projecao,
+                )
+
+                if not iniciou_arraste:
+                    objeto_selecionado = None
+
     elif action == glfw.RELEASE:
         arrastando_mouse = False
+        objeto_selecionado = None
+        organizador.encerrar_arraste()
+
+        if not camera.modo_primeira_pessoa:
+            mouse_x, mouse_y = glfw.get_cursor_pos(window)
+            largura, altura = glfw.get_window_size(window)
+            objeto_hover = organizador.selecionar(
+                mouse_x,
+                mouse_y,
+                largura,
+                altura,
+                camera,
+                projecao,
+            )
+        else:
+            objeto_hover = None
 
 def cursor_position_callback(window, xpos, ypos):
-    global mouse_x_anterior, mouse_y_anterior
+    global mouse_x_anterior, mouse_y_anterior, objeto_hover
     diferenca_x = xpos - mouse_x_anterior
     diferenca_y = ypos - mouse_y_anterior
     mouse_x_anterior, mouse_y_anterior = xpos, ypos
@@ -64,9 +119,35 @@ def cursor_position_callback(window, xpos, ypos):
         camera.fp_yaw += diferenca_x * sensibilidade
         camera.fp_pitch = max(-89.0, min(89.0, camera.fp_pitch - diferenca_y * sensibilidade))
         camera.atualizar_view()
+        objeto_hover = None
         return
 
-    if not arrastando_mouse: return
+    if not arrastando_mouse:
+        largura, altura = glfw.get_window_size(window)
+        objeto_hover = organizador.selecionar(
+            xpos,
+            ypos,
+            largura,
+            altura,
+            camera,
+            projecao,
+        )
+
+    if not arrastando_mouse:
+        return
+
+    if objeto_selecionado is not None:
+        largura, altura = glfw.get_window_size(window)
+        organizador.atualizar_arraste(
+            xpos,
+            ypos,
+            largura,
+            altura,
+            camera,
+            projecao,
+        )
+        return
+
     camera.yaw -= diferenca_x * sensibilidade
     camera.pitch -= diferenca_y * sensibilidade
     camera.atualizar_orbita()
@@ -115,7 +196,9 @@ def atualizar_projecao(largura, altura):
     glViewport(0, 0, largura, altura)
 
 def init():
-    global vaoId, shaderId, modelo_loc, visualizacao_loc, projecao_loc, cor_loc, cubos
+    global vaoId, shaderId, modelo_loc, visualizacao_loc, projecao_loc, cor_loc
+    global cubos, objetos_moveis, organizador
+    global ebo_triangulos_id, ebo_arestas_id
 
     glClearColor(0.12, 0.16, 0.20, 1.0)
     glEnable(GL_DEPTH_TEST)
@@ -129,9 +212,26 @@ def init():
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * 4, ctypes.c_void_p(0))
     glEnableVertexAttribArray(0)
 
-    eboId = glGenBuffers(1)
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, eboId)
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices_array.nbytes, indices_array, GL_STATIC_DRAW)
+    ebo_triangulos_id = glGenBuffers(1)
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo_triangulos_id)
+    glBufferData(
+        GL_ELEMENT_ARRAY_BUFFER,
+        indices_array.nbytes,
+        indices_array,
+        GL_STATIC_DRAW,
+    )
+
+    indices_arestas_array = np.array(INDICES_ARESTAS, dtype=np.uint8)
+    ebo_arestas_id = glGenBuffers(1)
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo_arestas_id)
+    glBufferData(
+        GL_ELEMENT_ARRAY_BUFFER,
+        indices_arestas_array.nbytes,
+        indices_arestas_array,
+        GL_STATIC_DRAW,
+    )
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo_triangulos_id)
     glBindVertexArray(0)
     glBindBuffer(GL_ARRAY_BUFFER, 0)
 
@@ -149,7 +249,8 @@ def init():
     projecao_loc = glGetUniformLocation(shaderId, "projecao")
     cor_loc = glGetUniformLocation(shaderId, "corObjeto")
 
-    cubos = construir_laboratorio()
+    cubos, objetos_moveis = construir_laboratorio()
+    organizador = Organizador(objetos_moveis)
 
 def render():
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
@@ -161,8 +262,18 @@ def render():
     glBindVertexArray(vaoId)
     for cubo in cubos:
         cubo.desenhar(modelo_loc, cor_loc, total_indices)
+
+    if objeto_hover is not None:
+        glLineWidth(1.0)
+        for parte in objeto_hover.partes:
+            parte.desenhar_contorno(
+                modelo_loc,
+                cor_loc,
+                ebo_arestas_id,
+                ebo_triangulos_id,
+            )
+
     glBindVertexArray(0)
-    glUseProgram(0)
 
 def main():
     if not glfw.init(): raise RuntimeError("Erro ao inicializar GLFW")
@@ -170,7 +281,7 @@ def main():
     if not window:
         glfw.terminate()
         raise RuntimeError("Erro ao criar janela")
-
+ 
     glfw.make_context_current(window)
     configurar_cursor(window, camera.modo_primeira_pessoa)
     glfw.swap_interval(1)
