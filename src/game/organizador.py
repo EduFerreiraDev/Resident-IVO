@@ -1,4 +1,5 @@
 import glm
+from src.entities.laboratorio import LIMITE_INTERIOR
 
 
 class Organizador:
@@ -100,12 +101,12 @@ class Organizador:
         centro_z = ponto.z + self.deslocamento_cursor_z
 
         centro_x = max(
-            -4.5 + meia_largura,
-            min(4.5 - meia_largura, centro_x),
+            -LIMITE_INTERIOR + meia_largura,
+            min(LIMITE_INTERIOR - meia_largura, centro_x),
         )
         centro_z = max(
-            -4.5 + meia_profundidade,
-            min(4.5 - meia_profundidade, centro_z),
+            -LIMITE_INTERIOR + meia_profundidade,
+            min(LIMITE_INTERIOR - meia_profundidade, centro_z),
         )
 
         novo_x_min = centro_x - meia_largura

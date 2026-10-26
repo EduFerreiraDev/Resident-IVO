@@ -29,6 +29,7 @@ total_indices = indices_array.size
 vaoId, shaderId = 0, 0
 ebo_triangulos_id, ebo_arestas_id = 0, 0
 modelo_loc, visualizacao_loc, projecao_loc, cor_loc = -1, -1, -1, -1
+camera_loc, direcao_loc, primeira_pessoa_loc, tempo_loc = -1, -1, -1, -1
 projecao = glm.mat4(1.0)
 cubos = []
 objetos_moveis = []
@@ -199,8 +200,9 @@ def init():
     global vaoId, shaderId, modelo_loc, visualizacao_loc, projecao_loc, cor_loc
     global cubos, objetos_moveis, organizador
     global ebo_triangulos_id, ebo_arestas_id
+    global camera_loc, direcao_loc, primeira_pessoa_loc, tempo_loc
 
-    glClearColor(0.12, 0.16, 0.20, 1.0)
+    glClearColor(0.035, 0.045, 0.06, 1.0)
     glEnable(GL_DEPTH_TEST)
 
     vaoId = glGenVertexArrays(1)
@@ -248,6 +250,10 @@ def init():
     visualizacao_loc = glGetUniformLocation(shaderId, "visualizacao")
     projecao_loc = glGetUniformLocation(shaderId, "projecao")
     cor_loc = glGetUniformLocation(shaderId, "corObjeto")
+    camera_loc = glGetUniformLocation(shaderId, "posicaoCamera")
+    direcao_loc = glGetUniformLocation(shaderId, "direcaoCamera")
+    primeira_pessoa_loc = glGetUniformLocation(shaderId, "primeiraPessoa")
+    tempo_loc = glGetUniformLocation(shaderId, "tempo")
 
     cubos, objetos_moveis = construir_laboratorio()
     organizador = Organizador(objetos_moveis)
@@ -258,6 +264,12 @@ def render():
 
     glUniformMatrix4fv(visualizacao_loc, 1, GL_FALSE, glm.value_ptr(camera.view_matrix))
     glUniformMatrix4fv(projecao_loc, 1, GL_FALSE, glm.value_ptr(projecao))
+    posicao_camera = camera.fp_pos if camera.modo_primeira_pessoa else camera.pos
+    glUniform3f(camera_loc, *posicao_camera)
+    direcao = camera.direcao_fp() if camera.modo_primeira_pessoa else glm.normalize(camera.alvo - camera.pos)
+    glUniform3f(direcao_loc, *direcao)
+    glUniform1i(primeira_pessoa_loc, camera.modo_primeira_pessoa)
+    glUniform1f(tempo_loc, glfw.get_time())
 
     glBindVertexArray(vaoId)
     for cubo in cubos:

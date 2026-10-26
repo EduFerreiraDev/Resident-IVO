@@ -1,5 +1,6 @@
 import glm
 from src.game.colisao import resolver_movimento
+from src.entities.laboratorio import LIMITE_INTERIOR
 
 class Camera:
     def __init__(self):
@@ -7,7 +8,7 @@ class Camera:
 
         # Câmera Orbital
         self.alvo = glm.vec3(0.0, -0.5, 0.0)
-        self.distancia = glm.length(glm.vec3(0.0, 5.5, 11.0))
+        self.distancia = glm.length(glm.vec3(0.0, 8.0, 17.0))
         self.yaw = 0.0
         self.pitch = 26.565
         self.pos = glm.vec3(0.0, 5.0, 11.0)
@@ -67,7 +68,7 @@ class Camera:
             velocidade = 3.0
             deslocamento = glm.normalize(deslocamento) * velocidade * delta_tempo
             nova_pos = resolver_movimento(self.fp_pos, deslocamento, objetos_colisao)
-            nova_pos.x = max(-4.5, min(4.5, nova_pos.x))
-            nova_pos.z = max(-4.5, min(4.5, nova_pos.z))
+            nova_pos.x = max(-LIMITE_INTERIOR, min(LIMITE_INTERIOR, nova_pos.x))
+            nova_pos.z = max(-LIMITE_INTERIOR, min(LIMITE_INTERIOR, nova_pos.z))
             self.fp_pos = nova_pos
             self.atualizar_view()

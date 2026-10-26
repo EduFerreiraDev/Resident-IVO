@@ -6,10 +6,11 @@ uniform mat4 modelo;
 uniform mat4 visualizacao;
 uniform mat4 projecao;
 
+out vec3 posicaoMundo;
+
 void main()
 {
-    gl_Position = projecao
-                * visualizacao
-                * modelo
-                * vec4(posicao, 1.0);
+    vec4 mundo = modelo * vec4(posicao, 1.0);
+    posicaoMundo = mundo.xyz;
+    gl_Position = projecao * visualizacao * mundo;
 }
