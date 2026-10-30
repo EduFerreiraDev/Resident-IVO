@@ -50,7 +50,14 @@ def construir_laboratorio():
         ])
 
     for x, z in ((4.8, 3.8), (5.3, 4.5), (-4.4, -3.8)):
-        cubos.append(Cubo((x, -2.05, z), (0.48, 0.35, 0.48), (0.29, 0.24, 0.19), colisivel=True))
+        caixa = Cubo(
+            (x, -2.05, z),
+            (0.48, 0.35, 0.48),
+            (0.29, 0.24, 0.19),
+            colisivel=True,
+        )
+        cubos.append(caixa)
+        objetos_moveis.append(ObjetoMovel([caixa]))
 
     # Marcas no piso e uma luminária fria suspensa.
     for x, z in ((-2.5, 3.4), (3.2, -3.7), (4.1, 1.8)):

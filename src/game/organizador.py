@@ -35,6 +35,9 @@ class Organizador:
         menor_distancia = float("inf")
 
         for objeto in self.objetos_moveis:
+            if objeto.eh_mesa:
+                continue
+            
             for parte in objeto.partes:
                 distancia = self._interseccao_caixa(
                     origem,
