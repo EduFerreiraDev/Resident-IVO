@@ -35,6 +35,15 @@ cubos = []
 objetos_moveis = []
 camera = Camera()
 
+#Estado da iluminação do teto 
+lampada_ligada = False
+
+#Posicao lampada
+POSICAO_LAMPADA = (0.0, 2.25, 0.0)
+
+#Posicao interruptor
+POSICAO_INTERRUPTOR = (6.72, -0.4, -1.15)
+
 arrastando_mouse = False
 mouse_x_anterior, mouse_y_anterior = 0.0, 0.0
 organizador = None
@@ -156,6 +165,35 @@ def cursor_position_callback(window, xpos, ypos):
 def key_callback(window, key, scancode, action, mods):
     if action not in (glfw.PRESS, glfw.REPEAT): return
 
+    global lampada_ligada
+
+    #interação com o interruptor
+
+    if key == glfw.KEY_E and action == glfw.PRESS:
+
+        if not camera.modo_primeira_pessoa:
+            return
+
+        posicao_interruptor = glm.vec3(POSICAO_INTERRUPTOR)
+
+        distancia = glm.distance(camera.fp_pos, posicao_interruptor)
+
+        print("Posição do jogador: ", camera.fp_pos)
+        print("Distância: ", distancia)
+
+        if distancia < 2.5:
+            lampada_ligada = not lampada_ligada
+
+            if lampada_ligada:
+                print("Lampada do teto ligada!")
+            else: 
+                print("Lampada do teto desligada")
+
+        else:
+            print("Aproxime-se do interruptor!")
+
+        return
+
     if key == glfw.KEY_1:
         if not camera.modo_primeira_pessoa:
             camera.modo_primeira_pessoa = True
@@ -201,6 +239,7 @@ def init():
     global cubos, objetos_moveis, organizador
     global ebo_triangulos_id, ebo_arestas_id
     global camera_loc, direcao_loc, primeira_pessoa_loc, tempo_loc
+    global lampada_loc, posicao_lampada_loc
 
     glClearColor(0.035, 0.045, 0.06, 1.0)
     glEnable(GL_DEPTH_TEST)
@@ -239,8 +278,8 @@ def init():
 
     # Carregar Shaders da pasta shaders/
     root_dir = Path(__file__).resolve().parent
-    with open(root_dir / "shaders/cubo_vert.glsl", "r", encoding="utf-8") as f: vs_src = f.read()
-    with open(root_dir / "shaders/cubo_frag.glsl", "r", encoding="utf-8") as f: fs_src = f.read()
+    with open(root_dir / "C:/Users/Emanuel/OneDrive/Documentos/GitHub/Resident-IVO/shaders/cubo_vert.glsl", "r", encoding="utf-8") as f: vs_src = f.read()
+    with open(root_dir / "C:/Users/Emanuel/OneDrive/Documentos/GitHub/Resident-IVO/shaders/cubo_frag.glsl", "r", encoding="utf-8") as f: fs_src = f.read()
 
     vsId = gls.compileShader(vs_src, GL_VERTEX_SHADER)
     fsId = gls.compileShader(fs_src, GL_FRAGMENT_SHADER)
@@ -254,6 +293,10 @@ def init():
     direcao_loc = glGetUniformLocation(shaderId, "direcaoCamera")
     primeira_pessoa_loc = glGetUniformLocation(shaderId, "primeiraPessoa")
     tempo_loc = glGetUniformLocation(shaderId, "tempo")
+
+    lampada_loc = glGetUniformLocation(shaderId, "lampadaLigada")
+
+    posicao_lampada_loc = glGetUniformLocation(shaderId, "posicaoLampada")
 
     cubos, objetos_moveis = construir_laboratorio()
     organizador = Organizador(objetos_moveis)
@@ -270,6 +313,12 @@ def render():
     glUniform3f(direcao_loc, *direcao)
     glUniform1i(primeira_pessoa_loc, camera.modo_primeira_pessoa)
     glUniform1f(tempo_loc, glfw.get_time())
+
+    # Enviar estado da lâmpada para o Shader
+    glUniform1i(lampada_loc, lampada_ligada)
+
+    # Enviar posição da lâmpada
+    glUniform3f(posicao_lampada_loc, *POSICAO_LAMPADA)
 
     glBindVertexArray(vaoId)
     for cubo in cubos:

@@ -5,6 +5,8 @@ uniform vec3 posicaoCamera;
 uniform vec3 direcaoCamera;
 uniform bool primeiraPessoa;
 uniform float tempo;
+uniform bool lampadaLigada;
+uniform vec3 posicaoLampada;
 
 in vec3 posicaoMundo;
 
@@ -24,6 +26,34 @@ void main()
     float vermelho = pulso * 2.0 / (1.0 + distanciaAlerta * distanciaAlerta * 0.18);
 
     vec3 luz = vec3(0.72, 0.85, 1.0) * iluminacao;
+
+    //Iluminação da lampada do teto
+    if(lampadaLigada) {
+
+        //oscilação da lampada
+        float piscada = 0.85 + 0.15 * sin(tempo * 8.0) + 0.10 * sin(tempo * 17.0);
+        
+        //apagões ocasionais
+        float falha = step(
+            0.18,
+            sin(tempo * 5.0) * sin(tempo * 11.0)
+        );
+
+        float intensidade = piscada * falha;
+
+        //Distância entre a lâmpda e o objeto
+        float distanciaLampada = length(posicaoMundo - posicaoLampada);
+
+        //A luza perde intensidade com a distância
+        float atenuacao = 1.0 / (1.0 + 0.18 * distanciaLampada + 0.12 * distanciaLampada * distanciaLampada);
+
+        //cor amarelada da lâmpada
+        vec3 corLampada = vec3(1.0, 0.72, 0.38);
+
+        luz += corLampada * intensidade * atenuacao * 2.5;
+        
+    }
+
     luz += vec3(1.0, 0.10, 0.07) * vermelho;
 
     if (primeiraPessoa) {
