@@ -278,8 +278,8 @@ def init():
 
     # Carregar Shaders da pasta shaders/
     root_dir = Path(__file__).resolve().parent
-    with open(root_dir / "C:/Users/Emanuel/OneDrive/Documentos/GitHub/Resident-IVO/shaders/cubo_vert.glsl", "r", encoding="utf-8") as f: vs_src = f.read()
-    with open(root_dir / "C:/Users/Emanuel/OneDrive/Documentos/GitHub/Resident-IVO/shaders/cubo_frag.glsl", "r", encoding="utf-8") as f: fs_src = f.read()
+    with open(root_dir / "shaders/cubo_vert.glsl", "r", encoding="utf-8") as f: vs_src = f.read()
+    with open(root_dir / "shaders/cubo_frag.glsl", "r", encoding="utf-8") as f: fs_src = f.read()
 
     vsId = gls.compileShader(vs_src, GL_VERTEX_SHADER)
     fsId = gls.compileShader(fs_src, GL_FRAGMENT_SHADER)
@@ -299,7 +299,7 @@ def init():
     posicao_lampada_loc = glGetUniformLocation(shaderId, "posicaoLampada")
 
     cubos, objetos_moveis = construir_laboratorio()
-    organizador = Organizador(objetos_moveis)
+    organizador = Organizador(objetos_moveis, cubos)
 
 def render():
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)

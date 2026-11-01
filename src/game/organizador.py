@@ -3,8 +3,9 @@ from src.entities.laboratorio import LIMITE_INTERIOR
 
 
 class Organizador:
-    def __init__(self, objetos_moveis):
+    def __init__(self, objetos_moveis, cubos):
         self.objetos_moveis = objetos_moveis
+        self.cubos = cubos
         self.mesa = next(
             objeto for objeto in objetos_moveis if objeto.eh_mesa
         )
@@ -141,14 +142,78 @@ class Organizador:
             altura_base - y_min,
             centro_z - centro_atual_z,
         )
-        self.objeto_arrastado.mover_por(deslocamento)
+        deslocamento_aplicado = self._mover_com_colisao(
+            self.objeto_arrastado,
+            deslocamento,
+            permitir_apoiar_na_mesa=esta_sobre_bancada and deslocamento.y > 0,
+        )
 
         if self.objeto_arrastado.eh_mesa:
             for objeto in self.objetos_sobre_mesa:
-                objeto.mover_por(deslocamento)
+                objeto.mover_por(deslocamento_aplicado)
 
     def encerrar_arraste(self):
         self.objeto_arrastado = None
+
+    def _mover_com_colisao(
+        self, objeto, deslocamento, permitir_apoiar_na_mesa
+    ):
+        aplicado = glm.vec3(0.0)
+
+        for eixo in ("x", "z", "y"):
+            movimento = getattr(deslocamento, eixo)
+            if movimento == 0:
+                continue
+
+            permitido = movimento
+            eixos_transversais = [
+                outro for outro in ("x", "y", "z") if outro != eixo
+            ]
+
+            for parte in objeto.partes:
+                minimo = parte.posicao - parte.escala
+                maximo = parte.posicao + parte.escala
+
+                for cubo in self.cubos:
+                    if not cubo.colisao_ativa:
+                        continue
+                    if any(cubo is p for p in objeto.partes):
+                        continue
+                    if permitir_apoiar_na_mesa and cubo is self.mesa.tampo:
+                        continue
+
+                    cubo_minimo = cubo.posicao - cubo.escala
+                    cubo_maximo = cubo.posicao + cubo.escala
+
+                    sobrepoe_transversalmente = all(
+                        getattr(minimo, outro) < getattr(cubo_maximo, outro)
+                        and getattr(maximo, outro) > getattr(cubo_minimo, outro)
+                        for outro in eixos_transversais
+                    )
+                    if not sobrepoe_transversalmente:
+                        continue
+
+                    if movimento > 0:
+                        distancia = (
+                            getattr(cubo_minimo, eixo)
+                            - getattr(maximo, eixo)
+                        )
+                        if 0 <= distancia < permitido:
+                            permitido = distancia
+                    else:
+                        distancia = (
+                            getattr(cubo_maximo, eixo)
+                            - getattr(minimo, eixo)
+                        )
+                        if permitido < distancia <= 0:
+                            permitido = distancia
+
+            passo = glm.vec3(0.0)
+            setattr(passo, eixo, permitido)
+            objeto.mover_por(passo)
+            setattr(aplicado, eixo, permitido)
+
+        return aplicado
 
     def _encontrar_objetos_sobre_mesa(self):
         tampo = self.mesa.tampo

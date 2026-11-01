@@ -9,11 +9,12 @@ INDICES_ARESTAS = [
 ]
 
 class Cubo:
-    def __init__(self, posicao, escala, cor, colisivel=False):
+    def __init__(self, posicao, escala, cor, colisivel=False, colisao_ativa=True):
         self.posicao = glm.vec3(*posicao)
         self.escala = glm.vec3(*escala)
         self.cor = tuple(cor)
         self.colisivel = colisivel
+        self.colisao_ativa = colisao_ativa
 
         self.atualizar_modelo()
 

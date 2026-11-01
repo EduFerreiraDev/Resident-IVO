@@ -68,11 +68,14 @@ def construir_laboratorio():
 
     # Marcas no piso e uma luminária fria suspensa.
     for x, z in ((-2.5, 3.4), (3.2, -3.7), (4.1, 1.8)):
-        cubos.append(Cubo((x, -2.385, z), (0.7, 0.008, 0.3), (0.24, 0.13, 0.12)))
-    cubos.extend([
-        Cubo((0, 2.35, 0.0), (1.1, 0.08, 0.24), (0.18, 0.22, 0.24)),
-        Cubo((0, 2.25, 0.0), (0.85, 0.025, 0.15), (0.45, 0.62, 0.62)),
-    ])
+        cubos.append(
+            Cubo(
+                (x, -2.385, z),
+                (0.7, 0.008, 0.3),
+                (0.24, 0.13, 0.12),
+                colisao_ativa=False,
+            )
+        )
 
     # Mesa: tampo e pernas são movidos como um único objeto
     tampo_mesa = Cubo(
