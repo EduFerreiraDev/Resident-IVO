@@ -7,7 +7,10 @@ import glm
 from pathlib import Path
 
 from src.core.camera import Camera
-from src.entities.laboratorio import construir_laboratorio
+from src.core.interface import Interface
+from src.entities.cubo import Cubo
+from src.game.validacao import Validacao
+from src.entities.laboratorio import construir_laboratorio, POSICAO_INTERRUPTOR, POSICAO_ALERTA
 from src.game.organizador import Organizador
 from src.entities.cubo import INDICES_ARESTAS
 
@@ -35,20 +38,23 @@ cubos = []
 objetos_moveis = []
 camera = Camera()
 
-#Estado da iluminação do teto 
+#Estado da iluminação do teto
 lampada_ligada = False
 
 #Posicao lampada
 POSICAO_LAMPADA = (0.0, 2.25, 0.0)
-
-#Posicao interruptor
-POSICAO_INTERRUPTOR = (6.72, -0.4, -1.15)
 
 arrastando_mouse = False
 mouse_x_anterior, mouse_y_anterior = 0.0, 0.0
 organizador = None
 objeto_selecionado = None
 objeto_hover = None
+validacao = None
+interface = None
+mostrar_destinos = True
+ajuda = True
+luz_bancada = True
+destinos = []
 
 def configurar_cursor(window, modo_primeira_pessoa):
     global mouse_x_anterior, mouse_y_anterior
@@ -65,6 +71,8 @@ def mouse_button_callback(window, button, action, mods):
     global arrastando_mouse, mouse_x_anterior, mouse_y_anterior
     global objeto_selecionado, objeto_hover
 
+    if validacao is None:
+        return
     if button != glfw.MOUSE_BUTTON_LEFT:
         return
 
@@ -74,7 +82,7 @@ def mouse_button_callback(window, button, action, mods):
         objeto_selecionado = None
         objeto_hover = None
 
-        if not camera.modo_primeira_pessoa:
+        if not camera.modo_primeira_pessoa and validacao.estado == 'organizacao':
             largura, altura = glfw.get_window_size(window)
             objeto_selecionado = organizador.selecionar(
                 mouse_x_anterior,
@@ -101,8 +109,16 @@ def mouse_button_callback(window, button, action, mods):
 
     elif action == glfw.RELEASE:
         arrastando_mouse = False
-        objeto_selecionado = None
-        organizador.encerrar_arraste()
+        objeto = organizador.encerrar_arraste()
+        if objeto is not None:
+            if objeto.destino is None:
+                validacao.mensagem = 'Caixa decorativa reposicionada.'
+            elif validacao.correto(objeto):
+                validacao.mensagem = objeto.nome + ': posicao correta!'
+            else:
+                validacao.mensagem = objeto.nome + ': ajuste o destino e a orientacao.'
+            if validacao.organizado:
+                validacao.mensagem = 'Laboratorio organizado! Pressione Enter para iniciar o experimento.'
 
         if not camera.modo_primeira_pessoa:
             mouse_x, mouse_y = glfw.get_cursor_pos(window)
@@ -132,7 +148,7 @@ def cursor_position_callback(window, xpos, ypos):
         objeto_hover = None
         return
 
-    if not arrastando_mouse:
+    if not arrastando_mouse and validacao.estado == 'organizacao':
         largura, altura = glfw.get_window_size(window)
         objeto_hover = organizador.selecionar(
             xpos,
@@ -165,7 +181,45 @@ def cursor_position_callback(window, xpos, ypos):
 def key_callback(window, key, scancode, action, mods):
     if action not in (glfw.PRESS, glfw.REPEAT): return
 
-    global lampada_ligada
+    global lampada_ligada, luz_bancada, mostrar_destinos, ajuda
+    global arrastando_mouse, objeto_hover, objeto_selecionado
+    if key == glfw.KEY_ESCAPE:
+        glfw.set_window_should_close(window, True)
+        return
+    if action == glfw.PRESS:
+        if key == glfw.KEY_H:
+            ajuda = not ajuda
+            validacao.mensagem = '3 organizar | Arrastar mover | Q/R girar | Z/X escala | L/B luz | G destinos | Enter experimento'
+            return
+        if key == glfw.KEY_G:
+            mostrar_destinos = not mostrar_destinos
+            return
+        if key == glfw.KEY_L:
+            lampada_ligada = not lampada_ligada
+            return
+        if key == glfw.KEY_B:
+            luz_bancada = not luz_bancada
+            return
+        if key == glfw.KEY_ENTER:
+            if organizador.objeto_arrastado is not None:
+                organizador.encerrar_arraste()
+            arrastando_mouse = False
+            objeto_hover = None
+            validacao.iniciar_experimento(glfw.get_time())
+            return
+    if key in (glfw.KEY_Q, glfw.KEY_R, glfw.KEY_Z, glfw.KEY_X):
+        if validacao.estado != 'organizacao' or camera.modo_primeira_pessoa:
+            return
+        if objeto_selecionado is None:
+            validacao.mensagem = 'Selecione um equipamento com o mouse primeiro.'
+            return
+        graus = -15 if key == glfw.KEY_Q else 15 if key == glfw.KEY_R else 0
+        fator = 0.9 if key == glfw.KEY_Z else 1.1 if key == glfw.KEY_X else 1
+        if not organizador.transformar(objeto_selecionado, graus, fator):
+            validacao.mensagem = 'Transformacao bloqueada: objeto atingiria outro objeto ou a sala.'
+        else:
+            validacao.mensagem = 'Transformacao aplicada. Confira a orientacao indicada.'
+        return
 
     #interação com o interruptor
 
@@ -178,22 +232,24 @@ def key_callback(window, key, scancode, action, mods):
 
         distancia = glm.distance(camera.fp_pos, posicao_interruptor)
 
-        print("Posição do jogador: ", camera.fp_pos)
-        print("Distância: ", distancia)
 
         if distancia < 2.5:
             lampada_ligada = not lampada_ligada
 
             if lampada_ligada:
-                print("Lampada do teto ligada!")
-            else: 
-                print("Lampada do teto desligada")
+                validacao.mensagem = 'Lampada do teto ligada.'
+            else:
+                validacao.mensagem = 'Lampada do teto desligada.'
 
         else:
-            print("Aproxime-se do interruptor!")
+            validacao.mensagem = 'Aproxime-se do interruptor ou use L para controlar a luz.'
 
         return
 
+    if key in (glfw.KEY_1, glfw.KEY_3):
+        arrastando_mouse = False
+        organizador.encerrar_arraste()
+        objeto_hover = None
     if key == glfw.KEY_1:
         if not camera.modo_primeira_pessoa:
             camera.modo_primeira_pessoa = True
@@ -240,6 +296,7 @@ def init():
     global ebo_triangulos_id, ebo_arestas_id
     global camera_loc, direcao_loc, primeira_pessoa_loc, tempo_loc
     global lampada_loc, posicao_lampada_loc
+    global validacao, interface, destinos
 
     glClearColor(0.035, 0.045, 0.06, 1.0)
     glEnable(GL_DEPTH_TEST)
@@ -300,8 +357,19 @@ def init():
 
     cubos, objetos_moveis = construir_laboratorio()
     organizador = Organizador(objetos_moveis, cubos)
+    validacao = Validacao(objetos_moveis)
+    interface = Interface()
+    destinos = [(o, Cubo(tuple(o.destino + glm.vec3(0, 0.015, 0)),
+                          (0.12 if o.depende_de else 0.3, 0.008,
+                           0.12 if o.depende_de else 0.3), (0.9, 0.55, 0.15),
+                          colisao_ativa=False)) for o in validacao.obrigatorios]
 
-def render():
+def render(window=None):
+    largura, altura = glfw.get_framebuffer_size(window) if window else (1280, 800)
+    if largura <= 0 or altura <= 0:
+        return
+    agora = glfw.get_time()
+    validacao.atualizar(agora)
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
     glUseProgram(shaderId)
 
@@ -319,14 +387,39 @@ def render():
 
     # Enviar posição da lâmpada
     glUniform3f(posicao_lampada_loc, *POSICAO_LAMPADA)
+    glUniform3f(glGetUniformLocation(shaderId, 'posicaoAlerta'), *POSICAO_ALERTA)
 
+    glUniform1i(glGetUniformLocation(shaderId, 'luzBancada'), luz_bancada)
+    glUniform1f(glGetUniformLocation(shaderId, 'forcaExperimento'),
+                validacao.progresso(agora) if validacao.estado != 'organizacao' else 0)
+    emissao_loc = glGetUniformLocation(shaderId, 'emissao')
+    brilho_loc = glGetUniformLocation(shaderId, 'brilhoMaterial')
+    parede_loc = glGetUniformLocation(shaderId, 'paredeDesgastada')
+    bequer = validacao.por_id['bequer']
     glBindVertexArray(vaoId)
     for cubo in cubos:
+        if getattr(cubo, 'ocultar_orbital', False) and not camera.modo_primeira_pessoa:
+            continue
+        reagindo = cubo is bequer.partes[-1] and validacao.estado != 'organizacao'
+        if reagindo:
+            progresso = validacao.progresso(agora)
+            cubo.cor = (0.18 + 0.2 * progresso, 0.35 + 0.6 * progresso, 0.65 - 0.3 * progresso)
+        glUniform1f(emissao_loc, 0.8 if reagindo else 0.0)
+        glUniform1f(brilho_loc, 0.7 if cubo in bequer.partes else 0.2)
+        glUniform1i(parede_loc, cubo.parede)
         cubo.desenhar(modelo_loc, cor_loc, total_indices)
+    glUniform1i(parede_loc, False)
+    glUniform1f(brilho_loc, 0)
+    glUniform1f(emissao_loc, 0.9)
+    if mostrar_destinos and not camera.modo_primeira_pessoa:
+        for objeto, marcador in destinos:
+            marcador.cor = (0.15, 0.9, 0.45) if validacao.correto(objeto) else (0.9, 0.5, 0.12)
+            marcador.desenhar(modelo_loc, cor_loc, total_indices)
 
-    if objeto_hover is not None:
+    destaque = objeto_selecionado or objeto_hover
+    if destaque is not None:
         glLineWidth(1.0)
-        for parte in objeto_hover.partes:
+        for parte in destaque.partes:
             parte.desenhar_contorno(
                 modelo_loc,
                 cor_loc,
@@ -335,14 +428,21 @@ def render():
             )
 
     glBindVertexArray(0)
+    # O HUD usa coordenadas logicas; funciona tambem com escala de tela do Windows.
+    largura_ui, altura_ui = glfw.get_window_size(window) if window else (largura, altura)
+    interface.desenhar(largura_ui, altura_ui, validacao, objeto_selecionado,
+                      lampada_ligada, luz_bancada, ajuda, agora)
 
 def main():
     if not glfw.init(): raise RuntimeError("Erro ao inicializar GLFW")
-    window = glfw.create_window(800, 600, "Laboratorio 3D - Resident IVO", None, None)
+    glfw.window_hint(glfw.CONTEXT_VERSION_MAJOR, 3)
+    glfw.window_hint(glfw.CONTEXT_VERSION_MINOR, 3)
+    glfw.window_hint(glfw.OPENGL_PROFILE, glfw.OPENGL_CORE_PROFILE)
+    window = glfw.create_window(1280, 800, "Laboratorio 3D - Resident IVO", None, None)
     if not window:
         glfw.terminate()
         raise RuntimeError("Erro ao criar janela")
- 
+
     glfw.make_context_current(window)
     configurar_cursor(window, camera.modo_primeira_pessoa)
     glfw.swap_interval(1)
@@ -364,9 +464,10 @@ def main():
         ultimo_tempo = agora
 
         camera.mover_fp(window, delta_tempo, glfw, cubos)
-        render()
+        render(window)
         glfw.swap_buffers(window)
 
+    interface.fechar()
     glfw.terminate()
 
 if __name__ == "__main__":

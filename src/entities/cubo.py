@@ -1,4 +1,5 @@
 import ctypes
+import math
 import glm
 from OpenGL.GL import *
 
@@ -9,20 +10,32 @@ INDICES_ARESTAS = [
 ]
 
 class Cubo:
-    def __init__(self, posicao, escala, cor, colisivel=False, colisao_ativa=True):
+    def __init__(self, posicao, escala, cor, colisivel=False, colisao_ativa=True, apoio=False, parede=False):
         self.posicao = glm.vec3(*posicao)
         self.escala = glm.vec3(*escala)
         self.cor = tuple(cor)
         self.colisivel = colisivel
         self.colisao_ativa = colisao_ativa
+        self.apoio = apoio
+        self.parede = parede
+        self.rotacao = 0.0
 
         self.atualizar_modelo()
 
     def atualizar_modelo(self):
         modelo = glm.mat4(1.0)
         modelo = glm.translate(modelo, self.posicao)
+        modelo = glm.rotate(modelo, glm.radians(self.rotacao), glm.vec3(0, 1, 0))
         modelo = glm.scale(modelo, self.escala)
         self.modelo = modelo
+
+    def limites(self):
+        c = abs(math.cos(math.radians(self.rotacao)))
+        s = abs(math.sin(math.radians(self.rotacao)))
+        extensao = glm.vec3(c * self.escala.x + s * self.escala.z,
+                            self.escala.y,
+                            s * self.escala.x + c * self.escala.z)
+        return self.posicao - extensao, self.posicao + extensao
 
     def desenhar(self, modelo_loc, cor_loc, total_indices):
         glUniformMatrix4fv(

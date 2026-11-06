@@ -1,6 +1,6 @@
 import glm
 from src.game.colisao import resolver_movimento
-from src.entities.laboratorio import LIMITE_INTERIOR
+from src.entities.laboratorio import LIMITE_INTERIOR, MEIA_SALA
 
 class Camera:
     def __init__(self):
@@ -8,7 +8,7 @@ class Camera:
 
         # Câmera Orbital
         self.alvo = glm.vec3(0.0, -0.5, 0.0)
-        self.distancia = glm.length(glm.vec3(0.0, 8.0, 17.0))
+        self.distancia = glm.length(glm.vec3(0.0, 8.0, 17.0)) * MEIA_SALA / 7.0
         self.yaw = 0.0
         self.pitch = 26.565
         self.pos = glm.vec3(0.0, 5.0, 11.0)
